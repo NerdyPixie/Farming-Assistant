@@ -1,28 +1,36 @@
 import streamlit as st
-import requests
 from PIL import Image
-import io
+import numpy as np
+import tensorflow as tf
 import time
 
-# Function to send image for prediction to FastAPI backend
-def predict(image):
-    try:
-        # Prepare image for sending
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
+# Load the machine learning model from the directory
+def load_model(model_dir):
+    model = tf.keras.models.load_model(model_dir)
+    return model
 
-        # Send image to FastAPI endpoint
-        files = {'file': img_byte_arr}
-        response = requests.post('http://localhost:8000/predict', files=files)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data['class'], data['confidence']
-        else:
-            return None, None
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+# Function to preprocess the image
+def preprocess_image(image):
+    # Resize the image to the required input shape
+    image = image.resize((IMAGE_SIZE, IMAGE_SIZE))
+    # Convert the image to numpy array
+    img_array = np.array(image)
+    # Normalize the pixel values
+    img_array = img_array / 255.0
+    # Expand the dimensions to match the model's input shape
+    img_array = np.expand_dims(img_array, axis=0)
+    return img_array
+
+# Function to predict plant disease directly in Streamlit
+def predict(image, model):
+    # Preprocess the image
+    img_array = preprocess_image(image)
+    # Perform prediction using the loaded model
+    predictions = model.predict(img_array)
+    # Convert the prediction to class label and confidence
+    predicted_class = CLASS_NAMES[np.argmax(predictions[0])]
+    confidence = np.max(predictions[0])
+    return predicted_class, confidence
 
 # Streamlit UI
 def main():
@@ -34,6 +42,10 @@ def main():
 
     st.title("Plant Disease Classification 🌱")
     st.markdown("---")
+
+    # Load the model from the directory
+    model_dir = "./model"
+    model = load_model(model_dir)
 
     # Upload image
     uploaded_file = st.file_uploader("Upload an image of a plant leaf", type=["jpg", "jpeg", "png"], help="Supported formats: JPG, JPEG, PNG")
@@ -48,14 +60,14 @@ def main():
         # Predict button
         if st.button("Predict", key="predict_button"):
             with st.spinner('Predicting...'):
-                predicted_class, confidence = predict(image)
+                predicted_class, confidence = predict(image, model)
                 time.sleep(2)  # Simulate delay for demonstration purposes
                 if predicted_class is not None:
                     st.markdown("---")
                     st.success(f"🌿 Predicted Class: **{predicted_class}**")
                     st.info(f"🎯 Confidence: {confidence:.2f}")
                 else:
-                    st.error("Failed to get prediction from server.")
+                    st.error("Failed to get prediction.")
 
 # Run the Streamlit app
 if __name__ == "__main__":
