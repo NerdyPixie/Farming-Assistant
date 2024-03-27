@@ -44,7 +44,7 @@ def main():
     st.markdown("---")
 
     # Load the model from the directory
-    model_dir = "./models/1"
+    model_dir = "./models/1/"
     model = load_model(model_dir)
 
     # Upload image
